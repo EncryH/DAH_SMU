@@ -17,23 +17,22 @@
         <table>
           <tr><td>프로토콜</td><td><span class="badge b-mav" style="font-size:9px">MAVLink/UDP</span></td></tr>
           <tr><td>모드</td><td>AUTO</td></tr>
-          <tr><td>위도</td><td>37.568512</td></tr>
-          <tr><td>경도</td><td>126.978012</td></tr>
-          <tr><td>고도</td><td>120.5 m</td></tr>
-          <tr><td>속도</td><td>15.2 m/s</td></tr>
-          <tr><td>방향</td><td>084°</td></tr>
-          <tr><td>배터리</td><td><div class="batt"><div class="batt-bar"><span style="width:67%"></span></div>67%</div></td></tr>
+          <tr><td>위도</td><td id="map-uav-lat">--</td></tr>
+          <tr><td>경도</td><td id="map-uav-lon">--</td></tr>
+          <tr><td>고도</td><td id="map-uav-alt">-- m</td></tr>
+          <tr><td>속도</td><td id="map-uav-spd">-- m/s</td></tr>
+          <tr><td>방향</td><td id="map-uav-hdg">--°</td></tr>
+          <tr><td>연료</td><td><div class="batt"><div class="batt-bar"><span id="map-uav-fuel-bar" style="width:78%"></span></div><span id="map-uav-fuel">78%</span></div></td></tr>
           <tr><td>연결</td><td><div class="conn"><span class="conn-d"></span>연결됨</div></td></tr>
         </table>
         <div class="ip-title ip-ugv" style="margin-top:8px">UGV-001</div>
         <table>
           <tr><td>프로토콜</td><td><span class="badge b-ros" style="font-size:9px">ROS2/MQTT</span></td></tr>
           <tr><td>모드</td><td>AUTO</td></tr>
-          <tr><td>위치 X/Y</td><td>31.2 / 15.8 m</td></tr>
-          <tr><td>속도</td><td>2.1 m/s</td></tr>
-          <tr><td>방향</td><td>192°</td></tr>
-          <tr><td>배터리</td><td><div class="batt"><div class="batt-bar"><span style="width:74%"></span></div>74%</div></td></tr>
-          <tr><td>CPU</td><td>32%</td></tr>
+          <tr><td>위도</td><td id="map-ugv-lat">--</td></tr>
+          <tr><td>경도</td><td id="map-ugv-lon">--</td></tr>
+          <tr><td>속도</td><td id="map-ugv-spd">-- m/s</td></tr>
+          <tr><td>배터리</td><td><div class="batt"><div class="batt-bar"><span id="map-ugv-bat-bar" style="width:82%"></span></div><span id="map-ugv-bat">82%</span></div></td></tr>
           <tr><td>연결</td><td><div class="conn"><span class="conn-d"></span>연결됨</div></td></tr>
         </table>
       </div>
@@ -62,8 +61,8 @@
           <div class="cam-hud-tl">
             <div>UAV-001 / CAM-1 / EO</div>
             <div id="hud-alt">ALT: 120.5m  SPD: 15.2m/s</div>
-            <div>HDG: 084°  PITCH: -8°</div>
-            <div>37.5685N  126.9780E</div>
+            <div id="hud-uav-hdg">HDG: --°  FUEL: --%</div>
+            <div id="hud-uav-coord">--N  --E</div>
           </div>
           <div class="cam-hud-tr">
             <div id="hud-ts-uav">--:--:--</div>

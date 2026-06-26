@@ -12,4 +12,5 @@ RUN pip install -r requirements.txt
 COPY uav/mock_uav.py .
 
 # 실행 명령어
+ENV PYTHONUNBUFFERED=1
 CMD ["python", "mock_uav.py"]

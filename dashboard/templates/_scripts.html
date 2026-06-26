@@ -26,35 +26,28 @@
     { attribution: '', maxZoom: 20, maxNativeZoom: 19 }
   );
 
-  // UAV 캠 — 항공 하향 시점
-  const UAV_CENTER = [37.5756, 126.9769];
+  // UAV 캠 — 실제 UAV 좌표 추종 항공 하향 시점
   const camUAV = L.map('cam-uav-map', {
     zoomControl: false, attributionControl: false,
     dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
     keyboard: false, touchZoom: false, boxZoom: false,
-  }).setView(UAV_CENTER, 18);
+  }).setView([37.895, 126.800], 14);
   SAT().addTo(camUAV);
 
-  const UAV_ROUTE = [
-    [37.5748, 126.9752], [37.5752, 126.9760], [37.5756, 126.9769],
-    [37.5761, 126.9778], [37.5766, 126.9785], [37.5760, 126.9792],
-    [37.5754, 126.9787], [37.5748, 126.9778], [37.5745, 126.9765],
-    [37.5748, 126.9752],
-  ];
-  let uavRouteIdx = 0, uavFrac = 0;
-  setInterval(() => {
-    uavFrac += 0.018;
-    if (uavFrac >= 1) { uavFrac = 0; uavRouteIdx = (uavRouteIdx + 1) % (UAV_ROUTE.length - 1); }
-    const a = UAV_ROUTE[uavRouteIdx], b = UAV_ROUTE[uavRouteIdx + 1];
-    const lat = a[0] + (b[0] - a[0]) * uavFrac;
-    const lng = a[1] + (b[1] - a[1]) * uavFrac;
-    const jitter = 0.000008;
-    camUAV.panTo([lat + (Math.random()-0.5)*jitter, lng + (Math.random()-0.5)*jitter], { animate: true, duration: 0.18 });
-    const alt = (120.5 + Math.sin(Date.now()*0.0003)*1.5).toFixed(1);
-    const spd = (15.2 + Math.sin(Date.now()*0.0005)*0.4).toFixed(1);
+  // 실제 UAV 위치로 카메라 부드럽게 이동 — 데이터 주기(1.5s)마다 1회 호출
+  function updateCamUAV(u) {
+    if (!u || u.lat == null) return;
+    camUAV.panTo([u.lat, u.lon], { animate: true, duration: 1.4, easeLinearity: 1.0 });
+
     const el = document.getElementById('hud-alt');
-    if (el) el.textContent = `ALT: ${alt}m  SPD: ${spd}m/s`;
-  }, 180);
+    if (el) el.textContent = `ALT: ${u.alt ?? '--'}m  SPD: ${u.speed ?? '--'}m/s`;
+
+    const coord = document.getElementById('hud-uav-coord');
+    if (coord) coord.textContent = `${u.lat.toFixed(4)}N  ${u.lon.toFixed(4)}E`;
+
+    const hdg = document.getElementById('hud-uav-hdg');
+    if (hdg) hdg.textContent = `HDG: ${u.hdg != null ? Math.round(u.hdg) : '--'}°  FUEL: ${u.fuel ?? '--'}%`;
+  }
 
   // UGV 캠 — MapLibre GL pitch 65° 전방 시점
   const UGV_ROUTE = [
@@ -129,40 +122,25 @@
   setInterval(updateCamTS, 1000);
 
   // ── Leaflet 메인 맵 ───────────────────────────────────────────────────
-  const CENTER = [37.5685, 126.9780];
+  const CENTER = [37.9, 126.84];
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 });
   const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', maxZoom: 19 });
-  const map = L.map('leaflet-map', { zoomControl: false, layers: [satLayer] }).setView(CENTER, 15);
+  const map = L.map('leaflet-map', { zoomControl: false, layers: [satLayer] }).setView(CENTER, 12);
   L.control.zoom({ position: 'topright' }).addTo(map);
 
-  function cubicBezier(p0, p1, p2, p3, steps) {
-    const pts = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps, u = 1 - t;
-      pts.push([
-        u*u*u*p0[0] + 3*u*u*t*p1[0] + 3*u*t*t*p2[0] + t*t*t*p3[0],
-        u*u*u*p0[1] + 3*u*u*t*p1[1] + 3*u*t*t*p2[1] + t*t*t*p3[1],
-      ]);
-    }
-    return pts;
-  }
-
-  const uavSmooth = [
-    ...cubicBezier([37.5643,126.9695],[37.5645,126.9720],[37.5672,126.9736],[37.5685,126.9745], 18),
-    ...cubicBezier([37.5685,126.9745],[37.5691,126.9756],[37.5700,126.9770],[37.5698,126.9780], 14),
-    ...cubicBezier([37.5698,126.9780],[37.5697,126.9800],[37.5686,126.9815],[37.5678,126.9808], 14),
-    ...cubicBezier([37.5678,126.9808],[37.5670,126.9793],[37.5682,126.9768],[37.5690,126.9760], 14),
+  // mock_uav.py 웨이포인트와 동일
+  const UAV_WPS = [
+    [37.895, 126.800],
+    [37.945, 126.820],
+    [37.955, 126.870],
+    [37.930, 126.910],
+    [37.885, 126.905],
+    [37.860, 126.855],
+    [37.870, 126.810],
   ];
-  L.polyline(uavSmooth, { color: '#2563eb', weight: 4, opacity: 0.9, lineJoin: 'round', lineCap: 'round' }).addTo(map);
-
-  const ugvSmooth = [
-    ...cubicBezier([37.5643,126.9755],[37.5643,126.9758],[37.5648,126.9762],[37.5652,126.9763], 10),
-    ...cubicBezier([37.5652,126.9763],[37.5656,126.9764],[37.5660,126.9768],[37.5662,126.9772], 10),
-    ...cubicBezier([37.5662,126.9772],[37.5664,126.9775],[37.5665,126.9773],[37.5665,126.9770], 8),
-    ...cubicBezier([37.5665,126.9770],[37.5666,126.9762],[37.5663,126.9754],[37.5658,126.9750], 10),
-    ...cubicBezier([37.5658,126.9750],[37.5652,126.9746],[37.5645,126.9748],[37.5643,126.9755], 10),
-  ];
-  L.polyline(ugvSmooth, { color: '#16a34a', weight: 4, opacity: 0.9, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+  L.polyline([...UAV_WPS, UAV_WPS[0]], {
+    color: '#2563eb', weight: 2, dashArray: '6,5', opacity: 0.55
+  }).addTo(map);
 
   function makeWpIcon(label) {
     return L.divIcon({
@@ -179,49 +157,211 @@
       className: '', iconSize: [20, 26], iconAnchor: [10, 26]
     });
   }
-  [[37.5685,126.9745,'WP1'],[37.5698,126.9780,'WP2'],[37.5678,126.9808,'WP3']].forEach(([lat,lng,lbl]) =>
-    L.marker([lat,lng], { icon: makeWpIcon(lbl) }).addTo(map)
-  );
+  UAV_WPS.forEach((wp, i) => L.marker(wp, { icon: makeWpIcon(`WP${i+1}`) }).addTo(map));
 
+  // UAV — 송골매 실사 이미지 마커 (HDG에 따라 좌우 반전)
+  // 사진 원본: 기수가 왼쪽을 향함 → HDG 0~179(동쪽 방향)일 때 scaleX(-1) 적용
   const uavIcon = L.divIcon({
-    html: `<div style="position:relative;width:36px;height:36px">
-      <div style="position:absolute;inset:0;border-radius:50%;background:rgba(37,99,235,0.18);animation:mapPulse 2s infinite"></div>
-      <svg viewBox="0 0 36 36" width="36" height="36" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">
-        <line x1="18" y1="18" x2="6"  y2="6"  stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"/>
-        <line x1="18" y1="18" x2="30" y2="6"  stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"/>
-        <line x1="18" y1="18" x2="6"  y2="30" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"/>
-        <line x1="18" y1="18" x2="30" y2="30" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"/>
-        <circle cx="6"  cy="6"  r="4.5" fill="none" stroke="#60a5fa" stroke-width="1.8"/>
-        <circle cx="30" cy="6"  r="4.5" fill="none" stroke="#60a5fa" stroke-width="1.8"/>
-        <circle cx="6"  cy="30" r="4.5" fill="none" stroke="#60a5fa" stroke-width="1.8"/>
-        <circle cx="30" cy="30" r="4.5" fill="none" stroke="#60a5fa" stroke-width="1.8"/>
-        <rect x="14" y="14" width="8" height="8" rx="2" fill="#1d4ed8"/>
-        <circle cx="18" cy="18" r="2.5" fill="#93c5fd"/>
-      </svg>
+    html: `<div id="uav-icon-wrap" style="position:relative;width:100px;height:44px">
+      <div style="position:absolute;inset:0;border-radius:3px;background:rgba(37,99,235,0.08);animation:mapPulse 2s infinite"></div>
+      <img id="uav-img" src="/static/songolmae.png"
+           style="width:100px;height:44px;object-fit:cover;object-position:center 60%;
+                  position:absolute;inset:0;
+                  filter:drop-shadow(0 2px 8px rgba(0,0,0,.9)) brightness(1.05) contrast(1.1);
+                  transition:transform 0.4s ease"/>
     </div>`,
-    className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+    className: '', iconSize: [100, 44], iconAnchor: [50, 22]
   });
-  L.marker([37.5690, 126.9760], { icon: uavIcon }).addTo(map)
-    .bindTooltip('UAV-001', { permanent: true, direction: 'right', offset: [10, 0], className: 'wp-tooltip' });
 
+  // UGV — 탑뷰 전차, 포토리얼 그라디언트 + 궤도 링크
   const ugvIcon = L.divIcon({
-    html: `<div style="position:relative;width:34px;height:26px">
-      <div style="position:absolute;inset:0;border-radius:4px;background:rgba(22,163,74,0.18);animation:mapPulse 2.4s infinite"></div>
-      <svg viewBox="0 0 34 26" width="34" height="26" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">
-        <rect x="2" y="8" width="30" height="13" rx="2" fill="#15803d"/>
-        <rect x="7" y="3" width="14" height="8" rx="2" fill="#166534"/>
-        <circle cx="17" cy="10" r="4" fill="#14532d"/>
-        <rect x="18" y="8" width="8" height="2.5" rx="1" fill="#166534"/>
-        <rect x="1" y="18" width="32" height="5" rx="2.5" fill="#14532d"/>
-        <circle cx="6"  cy="20.5" r="3" fill="#166534" stroke="#4ade80" stroke-width="1"/>
-        <circle cx="17" cy="20.5" r="3" fill="#166534" stroke="#4ade80" stroke-width="1"/>
-        <circle cx="28" cy="20.5" r="3" fill="#166534" stroke="#4ade80" stroke-width="1"/>
+    html: `<div style="position:relative;width:72px;height:58px">
+      <div style="position:absolute;inset:0;border-radius:4px;background:rgba(22,163,74,0.12);animation:mapPulse 2.4s infinite"></div>
+      <svg viewBox="0 0 72 58" width="72" height="58" xmlns="http://www.w3.org/2000/svg"
+           style="position:absolute;inset:0;filter:drop-shadow(0 3px 7px rgba(0,0,0,.85))">
+        <defs>
+          <linearGradient id="gh" x1="0.5" y1="0" x2="0.5" y2="1">
+            <stop offset="0%"   stop-color="#4d7c3f"/>
+            <stop offset="40%"  stop-color="#365c2c"/>
+            <stop offset="100%" stop-color="#1e3a18"/>
+          </linearGradient>
+          <radialGradient id="gt" cx="42%" cy="38%">
+            <stop offset="0%"   stop-color="#5d9147"/>
+            <stop offset="55%"  stop-color="#3a6830"/>
+            <stop offset="100%" stop-color="#1e3a18"/>
+          </radialGradient>
+          <linearGradient id="gtr" x1="0.5" y1="0" x2="0.5" y2="1">
+            <stop offset="0%"   stop-color="#2d4a23"/>
+            <stop offset="100%" stop-color="#131f0f"/>
+          </linearGradient>
+        </defs>
+
+        <!-- 그림자 -->
+        <ellipse cx="36" cy="34" rx="28" ry="16" fill="rgba(0,0,0,0.28)"/>
+
+        <!-- 좌측 궤도 -->
+        <rect x="1"  y="5" width="11" height="48" rx="5.5" fill="url(#gtr)" stroke="#2d4a23" stroke-width="0.7"/>
+        <!-- 궤도 링크 (좌) -->
+        <rect x="2"  y="11" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="2"  y="16" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="2"  y="21" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="2"  y="26" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="2"  y="31" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="2"  y="36" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="2"  y="41" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <!-- 전방/후방 기동륜 (좌) -->
+        <circle cx="6.5" cy="8"  r="4.5" fill="#243b1c" stroke="#4d7c3f" stroke-width="1"/>
+        <circle cx="6.5" cy="8"  r="2"   fill="#365c2c"/>
+        <circle cx="6.5" cy="50" r="4.5" fill="#243b1c" stroke="#4d7c3f" stroke-width="1"/>
+        <circle cx="6.5" cy="50" r="2"   fill="#365c2c"/>
+
+        <!-- 우측 궤도 -->
+        <rect x="60" y="5" width="11" height="48" rx="5.5" fill="url(#gtr)" stroke="#2d4a23" stroke-width="0.7"/>
+        <!-- 궤도 링크 (우) -->
+        <rect x="61" y="11" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="61" y="16" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="61" y="21" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="61" y="26" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="61" y="31" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="61" y="36" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <rect x="61" y="41" width="9" height="1.8" rx="0.6" fill="#3a5c30" opacity="0.8"/>
+        <!-- 전방/후방 기동륜 (우) -->
+        <circle cx="65.5" cy="8"  r="4.5" fill="#243b1c" stroke="#4d7c3f" stroke-width="1"/>
+        <circle cx="65.5" cy="8"  r="2"   fill="#365c2c"/>
+        <circle cx="65.5" cy="50" r="4.5" fill="#243b1c" stroke="#4d7c3f" stroke-width="1"/>
+        <circle cx="65.5" cy="50" r="2"   fill="#365c2c"/>
+
+        <!-- 차체 (hull) -->
+        <rect x="12" y="8" width="48" height="42" rx="3.5" fill="url(#gh)" stroke="#2d4a23" stroke-width="0.7"/>
+
+        <!-- 전면 경사 장갑 -->
+        <polygon points="12,8 60,8 57,17 15,17" fill="#4d7c3f" stroke="#3a5c30" stroke-width="0.5"/>
+        <!-- 전면 ERA 블록 -->
+        <rect x="16" y="9"  width="9" height="6" rx="0.7" fill="#3a5c30" stroke="#243b1c" stroke-width="0.4"/>
+        <rect x="27" y="9"  width="9" height="6" rx="0.7" fill="#3a5c30" stroke="#243b1c" stroke-width="0.4"/>
+        <rect x="38" y="9"  width="9" height="6" rx="0.7" fill="#3a5c30" stroke="#243b1c" stroke-width="0.4"/>
+        <rect x="49" y="9"  width="8" height="6" rx="0.7" fill="#3a5c30" stroke="#243b1c" stroke-width="0.4"/>
+
+        <!-- 차체 패널 라인 -->
+        <line x1="12" y1="30" x2="60" y2="30" stroke="#243b1c" stroke-width="0.6" opacity="0.5"/>
+        <!-- 사이드 스커트 -->
+        <rect x="12" y="22" width="7"  height="22" rx="1" fill="#3a5c30" stroke="#243b1c" stroke-width="0.4" opacity="0.8"/>
+        <rect x="53" y="22" width="7"  height="22" rx="1" fill="#3a5c30" stroke="#243b1c" stroke-width="0.4" opacity="0.8"/>
+        <!-- 후면 -->
+        <rect x="15" y="44" width="42" height="6"  rx="2" fill="#1e3a18" stroke="#2d4a23" stroke-width="0.5"/>
+
+        <!-- 포탑 링 -->
+        <circle cx="36" cy="27" r="16" fill="#1e3a18" opacity="0.25"/>
+        <!-- 포탑 -->
+        <ellipse cx="36" cy="27" rx="14" ry="13" fill="url(#gt)" stroke="#2d4a23" stroke-width="0.8"/>
+        <!-- 포탑 전면 경사 하이라이트 -->
+        <ellipse cx="36" cy="22" rx="11" ry="5.5" fill="#5d9147" opacity="0.35"/>
+        <!-- 포탑 하이라이트 -->
+        <ellipse cx="34" cy="23" rx="5"  ry="3.5" fill="#7ab368"   opacity="0.15"/>
+
+        <!-- 주포 (tapering barrel) -->
+        <rect x="34" y="2"  width="4"   height="24" rx="2"   fill="#1a2e13" stroke="#2d4a23" stroke-width="0.5"/>
+        <rect x="33" y="2"  width="6"   height="5"  rx="1.5" fill="#111f0d" stroke="#243b1c" stroke-width="0.4"/>
+        <rect x="33.5" y="4" width="5" height="2"   rx="0.5" fill="#243b1c"/>
+
+        <!-- 동축기관총 -->
+        <rect x="38.5" y="10" width="1.8" height="12" rx="0.6" fill="#111f0d" stroke="#1a2e13" stroke-width="0.3"/>
+
+        <!-- 사수/전차장 해치 -->
+        <circle cx="33" cy="26" r="4.5" fill="#1a2e13" stroke="#3a5c30" stroke-width="0.7"/>
+        <circle cx="33" cy="26" r="2.2" fill="#111f0d"/>
+        <circle cx="40" cy="28" r="3"   fill="#1a2e13" stroke="#3a5c30" stroke-width="0.6"/>
+        <circle cx="40" cy="28" r="1.5" fill="#111f0d"/>
+
+        <!-- 열상/레이저 거리계 -->
+        <rect x="36" y="19" width="9" height="3" rx="1" fill="#111f0d" stroke="#243b1c" stroke-width="0.4"/>
+        <rect x="37" y="19.5" width="2.5" height="2" rx="0.5" fill="#1e3a5f"/>
+        <rect x="41" y="19.5" width="2.5" height="2" rx="0.5" fill="#1e3a5f"/>
+
+        <!-- 연막탄 발사기 -->
+        <rect x="15" y="19" width="6" height="3.5" rx="0.6" fill="#111f0d" stroke="#243b1c" stroke-width="0.3"/>
+        <circle cx="16.5" cy="20.5" r="0.8" fill="#374151"/>
+        <circle cx="18.5" cy="20.5" r="0.8" fill="#374151"/>
+        <circle cx="20.5" cy="20.5" r="0.8" fill="#374151"/>
       </svg>
     </div>`,
-    className: '', iconSize: [34, 26], iconAnchor: [17, 13]
+    className: '', iconSize: [72, 58], iconAnchor: [36, 29]
   });
-  L.marker([37.5665, 126.9770], { icon: ugvIcon }).addTo(map)
+
+  // 실시간 갱신용 마커 및 궤적
+  let uavMk = L.marker(UAV_WPS[0], { icon: uavIcon }).addTo(map)
+    .bindTooltip('UAV-001', { permanent: true, direction: 'right', offset: [10, 0], className: 'wp-tooltip' });
+  let ugvMk = L.marker([37.9017, 126.7924], { icon: ugvIcon }).addTo(map)
     .bindTooltip('UGV-001', { permanent: true, direction: 'right', offset: [10, 0], className: 'wp-tooltip' });
+
+  const uavPositions = [];
+  let uavTrail = L.polyline([], { color: '#2563eb', weight: 3, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+
+  // ── 보간 상태
+  let uavTarget = null, uavCurr = null;
+  let ugvTarget = null, ugvCurr = null;
+  let lastTrailLL = null;
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  // ── 60fps 부드러운 이동 루프
+  (function animateMap() {
+    requestAnimationFrame(animateMap);
+    if (uavTarget) {
+      if (!uavCurr) uavCurr = { lat: uavTarget.lat, lon: uavTarget.lon };
+      uavCurr.lat = lerp(uavCurr.lat, uavTarget.lat, 0.07);
+      uavCurr.lon = lerp(uavCurr.lon, uavTarget.lon, 0.07);
+      uavMk.setLatLng([uavCurr.lat, uavCurr.lon]);
+      // 궤적: 일정 거리 이상 이동 시 포인트 추가
+      if (!lastTrailLL ||
+          Math.abs(uavCurr.lat - lastTrailLL[0]) > 0.00012 ||
+          Math.abs(uavCurr.lon - lastTrailLL[1]) > 0.00012) {
+        const ll = [uavCurr.lat, uavCurr.lon];
+        uavPositions.push(ll);
+        if (uavPositions.length > 800) uavPositions.shift();
+        uavTrail.setLatLngs(uavPositions);
+        lastTrailLL = ll;
+      }
+      // Payload 카메라는 animateMap에서 직접 구동하지 않음 (updateCamUAV가 처리)
+    }
+    if (ugvTarget) {
+      if (!ugvCurr) ugvCurr = { lat: ugvTarget.lat, lon: ugvTarget.lon };
+      ugvCurr.lat = lerp(ugvCurr.lat, ugvTarget.lat, 0.05);
+      ugvCurr.lon = lerp(ugvCurr.lon, ugvTarget.lon, 0.05);
+      ugvMk.setLatLng([ugvCurr.lat, ugvCurr.lon]);
+    }
+  })();
+
+  // API 수신 시 목표값 업데이트 + 인포패널 갱신
+  function updateMapMarkers(platforms) {
+    const u = platforms['UAV-001'];
+    if (u && u.lat != null && u.lon != null) {
+      uavTarget = u;
+      updateCamUAV(u);
+      // HDG에 따라 이미지 좌우 반전 (원본 사진: 기수 왼쪽)
+      if (u.hdg != null) {
+        const imgEl = document.getElementById('uav-img');
+        if (imgEl) imgEl.style.transform = (u.hdg < 180) ? 'scaleX(-1)' : 'scaleX(1)';
+      }
+      const $ = id => document.getElementById(id);
+      if ($('map-uav-lat'))      $('map-uav-lat').textContent      = u.lat.toFixed(5);
+      if ($('map-uav-lon'))      $('map-uav-lon').textContent      = u.lon.toFixed(5);
+      if ($('map-uav-alt'))      $('map-uav-alt').textContent      = (u.alt ?? '--') + ' m';
+      if ($('map-uav-spd'))      $('map-uav-spd').textContent      = (u.speed ?? '--') + ' m/s';
+      if ($('map-uav-hdg'))      $('map-uav-hdg').textContent      = (u.hdg != null ? Math.round(u.hdg) : '--') + '°';
+      if ($('map-uav-fuel'))     $('map-uav-fuel').textContent     = (u.fuel ?? '--') + '%';
+      if ($('map-uav-fuel-bar')) $('map-uav-fuel-bar').style.width = (u.fuel ?? 78) + '%';
+    }
+    const g = platforms['UGV-001'];
+    if (g && g.lat != null && g.lon != null) {
+      ugvTarget = g;
+      const $ = id => document.getElementById(id);
+      if ($('map-ugv-lat'))     $('map-ugv-lat').textContent     = g.lat.toFixed(5);
+      if ($('map-ugv-lon'))     $('map-ugv-lon').textContent     = g.lon.toFixed(5);
+      if ($('map-ugv-spd'))     $('map-ugv-spd').textContent     = (g.speed ?? '--') + ' m/s';
+      if ($('map-ugv-bat'))     $('map-ugv-bat').textContent     = (g.battery ?? '--') + '%';
+      if ($('map-ugv-bat-bar')) $('map-ugv-bat-bar').style.width = (g.battery ?? 82) + '%';
+    }
+  }
 
   function setTab(el) {
     el.closest('.map-tabs').querySelectorAll('button').forEach(b => b.classList.remove('active'));
@@ -250,6 +390,8 @@
       const events    = data.events    || [];
       const platforms = {};
       (data.platforms || []).forEach(p => { platforms[p.platform_id] = p; });
+
+      updateMapMarkers(platforms);
 
       events.forEach(ev => {
         const key = `${ev.time}|${ev.source}|${ev.message}`;

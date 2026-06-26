@@ -53,6 +53,7 @@ services:
   # ── TICN 전술 라우터
   # CC(UAV) + UGV 텔레메트리 수신 → GCS / Mission Control / Dashboard / Collector fan-out
   # GCS/MC Command 수신 → CC 전달
+  # TICN 레이어: 채널(VHF/UHF/HF), 링크품질, 패킷손실, 재밍→채널홉
   tactical-router:
     build:
       context: .
@@ -62,6 +63,10 @@ services:
       CC_LISTEN_PORT: 14555
       UGV_LISTEN_PORT: 14660
       CMD_LISTEN_PORT: 14580
+      JAM_LISTEN_PORT: 14590
+      STATUS_PORT: 8080
+      ROUTER_LAT: "37.85"
+      ROUTER_LON: "126.85"
       MISSION_HOST: mission-control
       MISSION_PORT: 14540
       COLLECTOR_HOST: telemetry-collector
@@ -72,6 +77,8 @@ services:
       DASHBOARD_PORT: 14571
       CC_CMD_HOST: dah-companion
       CC_CMD_PORT: 14552
+    ports:
+      - "8084:8080"
     networks:
       - uav_net
       - ops_net

@@ -14,20 +14,21 @@ SYS_ID      = 1
 PLATFORM_ID = 'UAV-001'
 MISSION     = 'RECON'
 ALTITUDE    = 3500        # 순항 고도 (m)
-SPEED_KMH   = 150         # 순항 속도 (km/h)
+SPEED_KMH   = 600         # 순항 속도 (km/h)
 SPEED_MS    = SPEED_KMH / 3.6  # m/s
 FUEL        = 78
 EO_STATUS   = 'ACTIVE'
 IR_STATUS   = 'ACTIVE'
 
-# 경기 북부 정찰 웨이포인트 (위도, 경도)
+# 경기 북부 정찰 웨이포인트 (위도, 경도) — 각 꺾임이 명확한 다각형 경로
 WAYPOINTS = [
-    (37.900, 126.800),
-    (37.925, 126.830),
-    (37.940, 126.860),
-    (37.920, 126.890),
-    (37.895, 126.870),
-    (37.875, 126.835),
+    (37.895, 126.800),   # WP1 — 서쪽 출발점
+    (37.945, 126.820),   # WP2 — 북서 (위로 크게 이동)
+    (37.955, 126.870),   # WP3 — 북동 (오른쪽으로 이동)
+    (37.930, 126.910),   # WP4 — 동쪽 끝 (아래로 꺾임)
+    (37.885, 126.905),   # WP5 — 남동 (아래로 크게 이동)
+    (37.860, 126.855),   # WP6 — 남쪽 (왼쪽 아래로 꺾임)
+    (37.870, 126.810),   # WP7 — 남서 (왼쪽으로 꺾임)
 ]
 
 # 위경도 거리 계산 상수
@@ -67,11 +68,13 @@ def main():
     mav = mavutil.mavlink_connection(f'udpout:{UAV_HOST}:{UAV_PORT}', source_system=SYS_ID)
     mav.port.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-    seq      = 1
-    alt      = ALTITUDE
-    lat, lon = WAYPOINTS[0]
-    wp_idx   = 1   # 다음 목표 웨이포인트 인덱스
-    hdg      = 0
+    seq        = 1
+    alt        = ALTITUDE
+    lat, lon   = WAYPOINTS[0]
+    wp_idx     = 1   # 다음 목표 웨이포인트 인덱스
+    hdg        = 0
+    prev_dist  = None
+    cooldown   = 0   # 연속 감지 방지용
 
     print(f"[송골매] 정찰 비행 시작 | 웨이포인트 {len(WAYPOINTS)}개 순환")
 
@@ -87,18 +90,27 @@ def main():
             wp_lat, wp_lon = WAYPOINTS[wp_idx]
             hdg = heading_deg(lat, lon, wp_lat, wp_lon)
 
-            # 1초당 이동 거리(m) → 위경도 변환
             dlat = math.cos(math.radians(hdg)) * SPEED_MS * LAT_PER_M
             dlon = math.sin(math.radians(hdg)) * SPEED_MS * LON_PER_M
             lat += dlat
             lon += dlon
 
-            # 웨이포인트 도달 판정 (50m 이내)
             dist_m = math.sqrt(((lat - wp_lat) / LAT_PER_M) ** 2 +
                                ((lon - wp_lon) / LON_PER_M) ** 2)
-            if dist_m < 50:
-                wp_idx = (wp_idx + 1) % len(WAYPOINTS)
-                print(f"[송골매] WP{wp_idx} 도달 → 다음 WP{(wp_idx+1) % len(WAYPOINTS)}")
+
+            if cooldown > 0:
+                cooldown -= 1
+            else:
+                # 임계값(300m) 이내 진입 OR 최근접 통과(거리가 다시 벌어지는 순간)
+                reached = dist_m < 300
+                overshot = (prev_dist is not None and dist_m > prev_dist + 5 and prev_dist < 300)
+                if reached or overshot:
+                    print(f"[송골매] WP{wp_idx + 1} 도달 (dist={dist_m:.0f}m) → 다음 WP{(wp_idx + 2 - 1) % len(WAYPOINTS) + 1}")
+                    wp_idx = (wp_idx + 1) % len(WAYPOINTS)
+                    prev_dist = None
+                    cooldown = 8   # 8스텝(4초) 동안 재감지 차단
+                else:
+                    prev_dist = dist_m
 
             print(f"[송골매] POSITION | 위도={lat:.5f} 경도={lon:.5f} 고도={alt}m 방향={hdg:.1f}° | SEQ={seq+2}")
             print("-" * 50)
@@ -136,7 +148,7 @@ def main():
         )
 
         seq += 3
-        time.sleep(1)
+        time.sleep(0.5)
 
 
 if __name__ == '__main__':
