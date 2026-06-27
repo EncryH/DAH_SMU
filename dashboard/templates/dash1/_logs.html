@@ -1,24 +1,33 @@
-<!-- 대시보드1: 텔레메트리·커맨드·링크 로그 -->
+<!-- 대시보드1: 통합 로그 + 링크 상태 -->
 <div class="row-bot">
 
-  <!-- Telemetry 로그 -->
-  <div class="card">
-    <div class="card-title">Telemetry 로그 (상태 보고)</div>
-    <div class="log-scroll">
-      <table class="log-tbl">
-        <thead><tr><th>시간</th><th>대상</th><th>메시지 유형</th><th>프로토콜</th><th>주요 데이터</th></tr></thead>
-        <tbody id="d1-telem-body"></tbody>
-      </table>
+  <!-- 통합 로그 -->
+  <div class="card log-unified-card">
+    <div class="log-unified-header">
+      <span class="card-title" style="margin-bottom:0">로그</span>
+      <div class="log-filter-btns">
+        <button class="log-filter-btn active" data-filter="all">ALL</button>
+        <button class="log-filter-btn" data-filter="tel">Telemetry</button>
+        <button class="log-filter-btn" data-filter="cmd">Command</button>
+      </div>
+      <div class="log-search-wrap">
+        <input id="log-search" class="log-search" type="text" placeholder="검색...">
+      </div>
+      <span class="log-count" id="log-count">0 rows</span>
     </div>
-  </div>
-
-  <!-- Command 로그 -->
-  <div class="card">
-    <div class="card-title">Command 로그 (명령 전송)</div>
     <div class="log-scroll">
       <table class="log-tbl">
-        <thead><tr><th>시간</th><th>대상</th><th>명령</th><th>발신 주체</th><th>상태</th></tr></thead>
-        <tbody id="d1-cmd-body"></tbody>
+        <thead>
+          <tr>
+            <th style="width:68px">시간</th>
+            <th style="width:48px">유형</th>
+            <th style="width:72px">대상</th>
+            <th>내용</th>
+            <th style="width:80px">프로토콜</th>
+            <th style="width:52px">상태</th>
+          </tr>
+        </thead>
+        <tbody id="d1-log-body"></tbody>
       </table>
     </div>
   </div>
@@ -28,16 +37,13 @@
     <div class="card-title">통신 링크 상태</div>
     <div class="log-scroll">
       <table class="log-tbl">
-        <thead><tr><th>링크</th><th>상태</th><th>프로토콜</th><th>지연시간</th><th>손실률</th><th>마지막 수신</th></tr></thead>
-        <tbody>
-          <tr><td>UAV ↔ Gateway</td><td><span class="badge b-ok">정상</span></td><td>MAVLink/UDP</td><td>412 ms</td><td>1.3%</td><td>0.4초 전</td></tr>
-          <tr><td>UGV ↔ Gateway</td><td><span class="badge b-ok">정상</span></td><td>ROS2/MQTT</td><td>534 ms</td><td>1.3%</td><td>0.5초 전</td></tr>
-          <tr><td>Gateway ↔ GCS/C2</td><td><span class="badge b-ok">정상</span></td><td>TCP / UDP</td><td>201 ms</td><td>0.8%</td><td>0.2초 전</td></tr>
-          <tr><td>GCS/C2 ↔ UAV</td><td><span class="badge b-ok">정상</span></td><td>UDP</td><td>412 ms</td><td>1.3%</td><td>0.4초 전</td></tr>
-          <tr><td>GCS/C2 ↔ UGV</td><td><span class="badge b-ok">정상</span></td><td>MQTT</td><td>534 ms</td><td>1.3%</td><td>0.5초 전</td></tr>
-          <tr><td>Router ↔ Collector</td><td><span class="badge b-ok">정상</span></td><td>UDP</td><td>88 ms</td><td>0.2%</td><td>0.1초 전</td></tr>
-          <tr><td>UAV ↔ C2 Direct</td><td><span class="badge b-ok">정상</span></td><td>MAVLink/UDP</td><td>398 ms</td><td>1.1%</td><td>0.3초 전</td></tr>
-          <tr><td>UGV ↔ C2 Direct</td><td><span class="badge b-warn">지연</span></td><td>MQTT</td><td>812 ms</td><td>3.2%</td><td>1.1초 전</td></tr>
+        <thead><tr><th>링크</th><th>상태</th><th>프로토콜</th><th>지연</th><th>손실</th></tr></thead>
+        <tbody id="d1-link-body">
+          <tr><td>UAV ↔ Router</td><td><span class="badge b-ok" id="lnk-uav-st">--</span></td><td>MAVLink/UDP</td><td id="lnk-uav-lat">-- ms</td><td id="lnk-uav-loss">-- %</td></tr>
+          <tr><td>UGV ↔ Router</td><td><span class="badge b-ok" id="lnk-ugv-st">--</span></td><td>ROS2/JSON</td><td id="lnk-ugv-lat">-- ms</td><td id="lnk-ugv-loss">-- %</td></tr>
+          <tr><td>Router ↔ GCS</td><td><span class="badge b-ok">정상</span></td><td>UDP</td><td>-- ms</td><td>--</td></tr>
+          <tr><td>Router ↔ C2</td><td><span class="badge b-ok">정상</span></td><td>UDP</td><td>-- ms</td><td>--</td></tr>
+          <tr><td>Router ↔ Collector</td><td><span class="badge b-ok">정상</span></td><td>UDP</td><td>-- ms</td><td>--</td></tr>
         </tbody>
       </table>
     </div>

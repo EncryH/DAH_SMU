@@ -30,55 +30,21 @@
       <p>C2 기반 Telemetry • Command • GCS/C2 모니터링</p>
     </div>
     <div class="header-right">
-      <div class="hdr-block">
-        <div class="lbl">현재 시간</div>
-        <div class="val" id="clock">--:--:--</div>
-        <div class="sub" id="clockDate">----.--.--</div>
-      </div>
-      <div class="hdr-badge">
-        <span class="dot b"></span>
-        <div><div class="lbl">자동 통신</div><div class="val" style="color:#6fb9ff">ON</div></div>
-      </div>
+      <!-- 상태 칩 -->
+      <div class="hdr-divider"></div>
+      <div class="hdr-chip"><span class="dot" id="dot-uav"></span><span class="chip-lbl">UAV</span><span class="chip-val" id="hdr-uav">--/1</span></div>
+      <div class="hdr-chip"><span class="dot" id="dot-ugv"></span><span class="chip-lbl">UGV</span><span class="chip-val" id="hdr-ugv">--/1</span></div>
+      <div class="hdr-chip"><span class="dot" id="dot-gcs"></span><span class="chip-lbl">GCS</span><span class="chip-val" id="hdr-gcs">--</span></div>
+      <div class="hdr-chip"><span class="dot" id="dot-c2"></span><span class="chip-lbl">C2</span><span class="chip-val" id="hdr-c2">--</span></div>
+      <div class="hdr-chip"><span class="dot" id="dot-latency"></span><span class="chip-lbl">지연</span><span class="chip-val" id="hdr-latency">-- ms</span></div>
+      <div class="hdr-chip"><span class="dot" id="dot-loss"></span><span class="chip-lbl">손실</span><span class="chip-val" id="hdr-loss">-- %</span></div>
+      <div class="hdr-divider"></div>
       <div class="hdr-badge">
         <span class="dot g"></span>
         <div><div class="lbl">시스템 상태</div><div class="val" style="color:#22c55e">모든 시스템 정상</div></div>
       </div>
     </div>
   </header>
-
-  <!-- 상태바 -->
-  <div class="status-bar">
-    <div class="scard"><div>
-      <div class="scard-lbl">UAV 연결 상태</div>
-      <div class="scard-val">1 / 1</div>
-      <div class="scard-sub"><span class="dot g"></span> 연결됨</div>
-    </div></div>
-    <div class="scard"><div>
-      <div class="scard-lbl">UGV 연결 상태</div>
-      <div class="scard-val">1 / 1</div>
-      <div class="scard-sub"><span class="dot g"></span> 연결됨</div>
-    </div></div>
-    <div class="scard"><div>
-      <div class="scard-lbl">GCS 상태</div>
-      <div class="scard-val">Online</div>
-      <div class="scard-sub"><span class="dot g"></span> 정상</div>
-    </div></div>
-    <div class="scard"><div>
-      <div class="scard-lbl">C2 서버 상태</div>
-      <div class="scard-val">Online</div>
-      <div class="scard-sub"><span class="dot g"></span> 정상</div>
-    </div></div>
-    <div class="scard"><div>
-      <div class="scard-lbl">평균 지연시간</div>
-      <div class="scard-val">612 <span style="font-size:11px;font-weight:400">ms</span></div>
-      <div class="scard-sub"><span class="dot g"></span> 양호</div>
-    </div></div>
-    <div class="scard"><div>
-      <div class="scard-lbl">패킷 손실률</div>
-      <div class="scard-val">2.1 <span style="font-size:11px;font-weight:400">%</span></div>
-      <div class="scard-sub"><span class="dot g"></span> 양호</div>
-    </div></div>
-  </div>
 
   <!-- 대시보드1 -->
   <div class="content" id="dash1">

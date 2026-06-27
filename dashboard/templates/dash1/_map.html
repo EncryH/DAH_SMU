@@ -2,44 +2,83 @@
 <div class="row-top">
 
   <!-- 지도 -->
-  <div class="card">
-    <div class="map-header">
-      <div class="card-title" style="margin-bottom:0">MAP / 트랙 뷰</div>
+  <div class="card" style="display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div class="map-header" style="padding:10px 14px 0">
+      <div class="card-title" style="margin-bottom:0">MAP / 작전 구역</div>
       <div class="map-tabs">
-        <button class="active" onclick="setTab(this)">지도</button>
-        <button onclick="setTab(this)">위성</button>
+        <button class="active" onclick="setTab(this)">위성</button>
+        <button onclick="setTab(this)">지도</button>
       </div>
     </div>
-    <div class="map-svg-wrap">
-      <div id="leaflet-map"></div>
-      <div class="map-info-panel">
-        <div class="ip-title ip-uav">UAV-001</div>
-        <table>
-          <tr><td>프로토콜</td><td><span class="badge b-mav" style="font-size:9px">MAVLink/UDP</span></td></tr>
-          <tr><td>모드</td><td>AUTO</td></tr>
-          <tr><td>위도</td><td id="map-uav-lat">--</td></tr>
-          <tr><td>경도</td><td id="map-uav-lon">--</td></tr>
-          <tr><td>고도</td><td id="map-uav-alt">-- m</td></tr>
-          <tr><td>속도</td><td id="map-uav-spd">-- m/s</td></tr>
-          <tr><td>방향</td><td id="map-uav-hdg">--°</td></tr>
-          <tr><td>연료</td><td><div class="batt"><div class="batt-bar"><span id="map-uav-fuel-bar" style="width:78%"></span></div><span id="map-uav-fuel">78%</span></div></td></tr>
-          <tr><td>연결</td><td><div class="conn"><span class="conn-d"></span>연결됨</div></td></tr>
-        </table>
-        <div class="ip-title ip-ugv" style="margin-top:8px">UGV-001</div>
-        <table>
-          <tr><td>프로토콜</td><td><span class="badge b-ros" style="font-size:9px">ROS2/MQTT</span></td></tr>
-          <tr><td>모드</td><td>AUTO</td></tr>
-          <tr><td>위도</td><td id="map-ugv-lat">--</td></tr>
-          <tr><td>경도</td><td id="map-ugv-lon">--</td></tr>
-          <tr><td>속도</td><td id="map-ugv-spd">-- m/s</td></tr>
-          <tr><td>배터리</td><td><div class="batt"><div class="batt-bar"><span id="map-ugv-bat-bar" style="width:82%"></span></div><span id="map-ugv-bat">82%</span></div></td></tr>
-          <tr><td>연결</td><td><div class="conn"><span class="conn-d"></span>연결됨</div></td></tr>
-        </table>
+    <!-- 맵 + 사이드 패널 -->
+    <div style="display:flex;flex:1;min-height:0;gap:0">
+      <!-- 맵 영역 -->
+      <div style="position:relative;flex:1;min-width:0">
+        <div id="leaflet-map" style="width:100%;height:100%"></div>
+        <!-- 범례 -->
+        <div class="map-legend">
+          <div class="leg-row"><div class="leg-line" style="background:#2563eb"></div>UAV 경로</div>
+          <div class="leg-row"><div class="leg-line" style="background:#16a34a"></div>UGV 경로</div>
+          <div class="leg-row"><div class="leg-dot"></div>Waypoint</div>
+          <div class="leg-row"><div class="leg-zone" style="background:rgba(239,68,68,0.25);border:1.5px dashed #ef4444"></div>목표 구역</div>
+          <div class="leg-row"><div class="leg-zone" style="background:rgba(234,88,12,0.22);border:1.5px solid #ea580c"></div>위협 구역</div>
+          <div class="leg-row"><div class="leg-zone" style="background:rgba(234,179,8,0.15);border:1.5px dashed #ca8a04"></div>통신 악화 구역</div>
+          <div class="leg-row"><div class="leg-zone" style="background:rgba(37,99,235,0.15);border:1.5px solid #2563eb"></div>UGV 작전 구역</div>
+        </div>
       </div>
-      <div class="map-legend">
-        <div class="leg-row"><div class="leg-line" style="background:#2563eb"></div>UAV 경로</div>
-        <div class="leg-row"><div class="leg-line" style="background:#16a34a"></div>UGV 경로</div>
-        <div class="leg-row"><div class="leg-dot"></div>Waypoint</div>
+      <!-- 사이드 정보 패널 -->
+      <div class="map-side-panel">
+        <!-- UAV -->
+        <div class="msp-section">
+          <div class="msp-title msp-uav">
+            <span class="msp-dot" id="msp-uav-dot"></span>UAV-001
+          </div>
+          <div class="msp-row"><span class="msp-lbl">프로토콜</span><span class="badge b-mav" style="font-size:9px">MAVLink / UDP</span></div>
+          <div class="msp-row"><span class="msp-lbl">모드</span><span class="msp-val">AUTO</span></div>
+          <div class="msp-row"><span class="msp-lbl">고도</span><span class="msp-val" id="msp-uav-alt">-- m</span></div>
+          <div class="msp-row"><span class="msp-lbl">속도</span><span class="msp-val" id="msp-uav-spd">-- m/s</span></div>
+          <div class="msp-row"><span class="msp-lbl">방향</span><span class="msp-val" id="msp-uav-hdg">--°</span></div>
+          <div class="msp-row"><span class="msp-lbl">배터리</span>
+            <div class="batt" style="flex:1"><div class="batt-bar"><span id="msp-uav-fuel-bar" style="width:78%"></span></div><span id="msp-uav-fuel">78%</span></div>
+          </div>
+          <div class="msp-row"><span class="msp-lbl">링크</span>
+            <span class="msp-signal" id="msp-uav-signal">
+              <span class="sig-bar s1"></span><span class="sig-bar s2"></span><span class="sig-bar s3"></span><span class="sig-bar s4"></span>
+            </span>
+            <span class="msp-val" id="msp-uav-link-txt">양호</span>
+          </div>
+          <div class="msp-row msp-coord"><span class="msp-lbl">좌표</span>
+            <span class="msp-val" style="font-size:10px;line-height:1.5">
+              <span id="msp-uav-lat">--</span> N<br><span id="msp-uav-lon">--</span> E
+            </span>
+          </div>
+        </div>
+
+        <div class="msp-divider"></div>
+
+        <!-- UGV -->
+        <div class="msp-section">
+          <div class="msp-title msp-ugv">
+            <span class="msp-dot msp-dot-g" id="msp-ugv-dot"></span>UGV-001
+          </div>
+          <div class="msp-row"><span class="msp-lbl">프로토콜</span><span class="badge b-ros" style="font-size:9px">ROS2 / MQTT</span></div>
+          <div class="msp-row"><span class="msp-lbl">모드</span><span class="msp-val">AUTO</span></div>
+          <div class="msp-row"><span class="msp-lbl">속도</span><span class="msp-val" id="msp-ugv-spd">-- m/s</span></div>
+          <div class="msp-row"><span class="msp-lbl">배터리</span>
+            <div class="batt" style="flex:1"><div class="batt-bar"><span id="msp-ugv-bat-bar" style="width:82%"></span></div><span id="msp-ugv-bat">82%</span></div>
+          </div>
+          <div class="msp-row"><span class="msp-lbl">링크</span>
+            <span class="msp-signal" id="msp-ugv-signal">
+              <span class="sig-bar s1"></span><span class="sig-bar s2"></span><span class="sig-bar s3"></span><span class="sig-bar s4"></span>
+            </span>
+            <span class="msp-val" id="msp-ugv-link-txt">양호</span>
+          </div>
+          <div class="msp-row msp-coord"><span class="msp-lbl">좌표</span>
+            <span class="msp-val" style="font-size:10px;line-height:1.5">
+              <span id="msp-ugv-lat">--</span> N<br><span id="msp-ugv-lon">--</span> E
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -54,7 +93,6 @@
       </div>
     </div>
     <div class="vid-wrap">
-      <!-- UAV 카메라 -->
       <div id="cam-uav" class="cam-layer">
         <div id="cam-uav-map" class="cam-map"></div>
         <div class="cam-hud">
@@ -80,14 +118,11 @@
           </div>
           <div class="cam-crosshair"><div class="ch-h"></div><div class="ch-v"></div></div>
           <div class="cam-tgt"></div>
-          <div class="cam-corner cam-corner-tl"></div>
-          <div class="cam-corner cam-corner-tr"></div>
-          <div class="cam-corner cam-corner-bl"></div>
-          <div class="cam-corner cam-corner-br"></div>
+          <div class="cam-corner cam-corner-tl"></div><div class="cam-corner cam-corner-tr"></div>
+          <div class="cam-corner cam-corner-bl"></div><div class="cam-corner cam-corner-br"></div>
           <div class="cam-scanlines"></div>
         </div>
       </div>
-      <!-- UGV 카메라 -->
       <div id="cam-ugv" class="cam-layer" style="display:none">
         <div id="cam-ugv-map" class="cam-map"></div>
         <div class="cam-hud">
@@ -111,10 +146,8 @@
             <div>STATUS: AUTO</div>
           </div>
           <div class="cam-crosshair"><div class="ch-h"></div><div class="ch-v"></div></div>
-          <div class="cam-corner cam-corner-tl"></div>
-          <div class="cam-corner cam-corner-tr"></div>
-          <div class="cam-corner cam-corner-bl"></div>
-          <div class="cam-corner cam-corner-br"></div>
+          <div class="cam-corner cam-corner-tl"></div><div class="cam-corner cam-corner-tr"></div>
+          <div class="cam-corner cam-corner-bl"></div><div class="cam-corner cam-corner-br"></div>
           <div class="cam-scanlines"></div>
         </div>
       </div>
