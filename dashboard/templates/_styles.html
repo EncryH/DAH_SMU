@@ -344,6 +344,8 @@
   }
   .log-filter-uav:not(.active) { color: #2563eb; }
   .log-filter-ugv:not(.active) { color: #16a34a; }
+  .log-filter-atk:not(.active) { color: #dc2626; }
+  .log-filter-def:not(.active) { color: #0891b2; }
   .log-search-wrap { width: 160px; flex: none; }
   .log-search {
     width: 100%; padding: 4px 10px; border-radius: 6px;
@@ -382,6 +384,8 @@
   .log-tbl tr:hover td { background: #eff6ff; transition: background 0.1s; }
   .log-tbl .row-uav { box-shadow: inset 3px 0 0 #6fb9ff; }
   .log-tbl .row-ugv { box-shadow: inset 3px 0 0 #22c55e; }
+  .log-tbl .row-atk { box-shadow: inset 3px 0 0 #ef4444; background: rgba(239,68,68,0.03); }
+  .log-tbl .row-def { box-shadow: inset 3px 0 0 #06b6d4; background: rgba(6,182,212,0.03); }
   .log-tbl tr:last-child td { border-bottom: none; }
 
   /* 뱃지 */
@@ -391,6 +395,12 @@
   .b-warn { background: #fef9c3; color: #a16207; border: 1px solid #fde68a; }
   .b-mav  { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
   .b-ros  { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+  .b-atk  { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+  .b-def  { background: #cffafe; color: #0e7490; border: 1px solid #67e8f9; }
+  .b-alert  { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
+  .b-blocked { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+  .log-type-atk { color: #dc2626; font-weight: 700; font-size: 10px; }
+  .log-type-def { color: #0891b2; font-weight: 700; font-size: 10px; }
 
   .batt { display: inline-flex; align-items: center; gap: 4px; }
   .batt-bar { width: 52px; height: 8px; background: #e5e9f0; border-radius: 4px; overflow: hidden; }

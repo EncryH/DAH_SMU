@@ -35,7 +35,7 @@ WAYPOINTS = [
 LAT_PER_M = 1 / 111_000
 LON_PER_M = 1 / (111_000 * math.cos(math.radians(37.9)))
 
-status = {'landed': False}
+status = {'mode': 'MISSION', 'alt': ALTITUDE}  # MISSION | LANDING | RTL
 
 
 def listen_for_commands():
@@ -48,11 +48,16 @@ def listen_for_commands():
         src = msg.get_srcSystem()
         cmd = msg.command
         if cmd == mavutil.mavlink.MAV_CMD_NAV_LAND:
-            print(f"[송골매] LAND 명령 수신 SYS_ID={src}")
-            status['landed'] = True
+            print(f"[송골매] ⚠️  LAND 명령 수신 SYS_ID={src} → 착륙 시작")
+            status['mode'] = 'LANDING'
         elif cmd == mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH:
-            print(f"[송골매] RTB 명령 수신 SYS_ID={src} → 귀환 착륙 실행")
-            status['landed'] = True
+            if status['mode'] == 'LANDING':
+                print(f"[송골매] ✅ RTL 수신 SYS_ID={src} → 착륙 취소, 순항 고도 복귀")
+                status['mode'] = 'MISSION'
+                status['alt'] = ALTITUDE  # 순항 고도로 즉시 복귀
+            else:
+                print(f"[송골매] RTL 명령 수신 SYS_ID={src} → 귀환")
+                status['mode'] = 'RTL'
 
 
 def heading_deg(lat1, lon1, lat2, lon2):
@@ -69,7 +74,6 @@ def main():
     mav.port.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
     seq        = 1
-    alt        = ALTITUDE
     lat, lon   = WAYPOINTS[0]
     wp_idx     = 1   # 다음 목표 웨이포인트 인덱스
     hdg        = 0
@@ -79,11 +83,21 @@ def main():
     print(f"[송골매] 정찰 비행 시작 | 웨이포인트 {len(WAYPOINTS)}개 순환")
 
     while True:
-        if status['landed']:
+        alt = status['alt']  # 방어 성공 시 스레드가 복구한 고도 반영
+
+        if status['mode'] == 'LANDING':
             alt = max(0, alt - 100)
-            print(f"[송골매] 착륙 중... 현재 고도={alt}m")
+            status['alt'] = alt
+            print(f"[송골매] ⚠️  착륙 중 (공격)... 현재 고도={alt}m")
             if alt == 0:
                 print("[송골매] 착륙 완료. 임무 중단.")
+                break
+        elif status['mode'] == 'RTL':
+            alt = max(0, alt - 100)
+            status['alt'] = alt
+            print(f"[송골매] RTL 귀환 중... 현재 고도={alt}m")
+            if alt == 0:
+                print("[송골매] RTL 완료.")
                 break
         else:
             # ── 다음 웨이포인트 방향으로 이동
@@ -106,6 +120,7 @@ def main():
                 overshot = (prev_dist is not None and dist_m > prev_dist + 5 and prev_dist < 300)
                 if reached or overshot:
                     print(f"[송골매] WP{wp_idx + 1} 도달 (dist={dist_m:.0f}m) → 다음 WP{(wp_idx + 2 - 1) % len(WAYPOINTS) + 1}")
+                    mav.mav.mission_item_reached_send(seq=wp_idx)
                     wp_idx = (wp_idx + 1) % len(WAYPOINTS)
                     prev_dist = None
                     cooldown = 8   # 8스텝(4초) 동안 재감지 차단

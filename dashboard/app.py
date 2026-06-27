@@ -16,7 +16,8 @@ GCS_TELEMETRY_PORT    = int(os.getenv("ROUTER_TELEMETRY_PORT", "14571"))  # GCS/
 
 # UDP로 직접 수신한 플랫폼 상태 + 로컬 이벤트 (UGV 등 GCS 비경유 데이터)
 router_platforms: dict = {}
-local_events: deque = deque(maxlen=100)
+local_events: deque  = deque(maxlen=100)
+agent_events: deque  = deque(maxlen=300)
 
 
 def _router_udp_listener():
@@ -29,6 +30,19 @@ def _router_udp_listener():
             payload = json.loads(data.decode())
             pid  = payload.get("platform_id", "UNKNOWN")
             ptype = payload.get("platform_type", "")
+            # 에이전트 판단 이벤트는 별도 큐에 저장
+            if ptype == "AGENT":
+                agent_events.appendleft({
+                    "time":       payload.get("time", time.strftime("%H:%M:%S")),
+                    "level":      payload.get("level", "info"),
+                    "agent_type": payload.get("agent_type", ""),
+                    "source":     payload.get("source", ""),
+                    "message":    payload.get("message", ""),
+                    "detail":     payload.get("detail", ""),
+                    "status":     payload.get("status", ""),
+                })
+                continue
+
             router_platforms[pid] = {**payload, "gcs_received_at": time.time()}
 
             # GCS를 거치지 않는 플랫폼(UGV 등)은 여기서 로컬 이벤트 생성
@@ -287,9 +301,10 @@ def live():
     return jsonify({
         "status": "ok",
         **dashboard,
-        "platforms": list(merged.values()),
-        "events":    merged_events[:50],
-        "gcs_direct": len(router_platforms),
+        "platforms":    list(merged.values()),
+        "events":       merged_events[:50],
+        "agent_events": list(agent_events)[:100],
+        "gcs_direct":   len(router_platforms),
     })
 
 

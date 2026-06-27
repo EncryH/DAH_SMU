@@ -18,6 +18,9 @@
             <span style="width:1px;height:16px;background:#dde1ea;display:inline-block;margin:0 4px;vertical-align:middle"></span>
             <button class="log-filter-btn" data-filter="tel">TEL</button>
             <button class="log-filter-btn" data-filter="cmd">CMD</button>
+            <span style="width:1px;height:16px;background:#dde1ea;display:inline-block;margin:0 4px;vertical-align:middle"></span>
+            <button class="log-filter-btn log-filter-atk" data-filter="atk">Attack Agent</button>
+            <button class="log-filter-btn log-filter-def" data-filter="def">Defense Agent</button>
           </div>
           <div class="log-search-wrap" style="margin-left:auto">
             <input id="log-search" class="log-search" type="text" placeholder="검색...">
@@ -42,14 +45,15 @@
     </div>
   </div>
 
-  <!-- 통신 링크 상태 -->
-  <div class="card">
-    <div class="card-title">통신 링크 상태</div>
-    <div class="log-scroll">
-      <table class="log-tbl">
+  <!-- 통신 링크 상태 + TICN/TMMR 시각화 -->
+  <div class="card" style="display:flex;flex-direction:column;gap:10px;min-height:0">
+
+    <!-- 링크 상태 테이블 (컴팩트) -->
+    <div>
+      <div class="card-title" style="margin-bottom:6px">통신 링크 상태</div>
+      <table class="lnk-tbl">
         <thead><tr><th>링크</th><th>상태</th><th>프로토콜</th><th>지연 / 품질</th><th>손실</th></tr></thead>
-        <tbody id="d1-link-body">
-          <!-- UAV: CC → GCS (MAVLink) -->
+        <tbody>
           <tr>
             <td>CC → GCS</td>
             <td><span class="badge" id="lnk-uav-st">--</span></td>
@@ -57,7 +61,6 @@
             <td id="lnk-uav-lat">-- ms</td>
             <td id="lnk-uav-loss">-- %</td>
           </tr>
-          <!-- UAV: GCS → Router (TMMR/TICN) -->
           <tr>
             <td>GCS → Router</td>
             <td><span class="badge" id="lnk-gcs-rt-st">--</span></td>
@@ -65,23 +68,19 @@
             <td id="lnk-gcs-rt-rssi">-- dBm</td>
             <td id="lnk-gcs-rt-loss">-- %</td>
           </tr>
-          <!-- UAV: Router → Upper C2/BMS (TICN) -->
           <tr>
-            <td>Router → Upper C2/BMS</td>
+            <td>Router → C2/BMS</td>
             <td><span class="badge" id="lnk-rt-c2-st">--</span></td>
             <td>TICN/UDP</td>
             <td id="lnk-rt-c2-lq">LQ --</td>
             <td id="lnk-rt-c2-loss">-- %</td>
           </tr>
-          <!-- Upper C2/BMS → Router → GCS (명령 하달) -->
           <tr>
             <td>C2 → Router → GCS</td>
             <td><span class="badge" id="lnk-c2-rt-st">--</span></td>
             <td>TICN/UDP</td>
-            <td>--</td>
-            <td>--</td>
+            <td>--</td><td>--</td>
           </tr>
-          <!-- UGV: UGV → Router (ROS2) -->
           <tr>
             <td>UGV → Router</td>
             <td><span class="badge" id="lnk-ugv-st">--</span></td>
@@ -89,17 +88,90 @@
             <td id="lnk-ugv-lat">-- ms</td>
             <td id="lnk-ugv-loss">-- %</td>
           </tr>
-          <!-- GCS → Collector (정적) -->
           <tr>
             <td>GCS → Collector</td>
             <td><span class="badge b-ok">정상</span></td>
             <td>UDP</td>
-            <td>--</td>
-            <td>--</td>
+            <td>--</td><td>--</td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <!-- 구분선 -->
+    <div style="height:1px;background:#edf0f5;flex-shrink:0"></div>
+
+    <!-- TMMR 신호 시각화 -->
+    <div>
+      <div class="card-title" style="margin-bottom:8px;font-size:11px">TMMR 무선링크</div>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+
+        <!-- RSSI 미터 -->
+        <div class="ticn-meter-wrap">
+          <div class="ticn-meter-label">RSSI</div>
+          <div class="ticn-rssi-bar-wrap">
+            <div class="ticn-rssi-bar" id="tmmr-rssi-bar"></div>
+          </div>
+          <div class="ticn-meter-val" id="tmmr-rssi-val">-- dBm</div>
+        </div>
+
+        <!-- 파형 -->
+        <div class="ticn-meter-wrap" style="flex:1">
+          <div class="ticn-meter-label">파형 (Waveform)</div>
+          <div style="margin-top:4px">
+            <span class="badge b-mav" id="tmmr-wf-badge" style="font-size:11px;padding:3px 8px">--</span>
+          </div>
+          <div class="ticn-meter-label" style="margin-top:6px">채널 상태</div>
+          <div id="tmmr-ch-status" style="font-size:11px;font-weight:600;color:#22c55e;margin-top:2px">정상</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 구분선 -->
+    <div style="height:1px;background:#edf0f5;flex-shrink:0"></div>
+
+    <!-- TICN 링크 시각화 -->
+    <div>
+      <div class="card-title" style="margin-bottom:8px;font-size:11px">TICN 전술망</div>
+      <div style="display:flex;gap:10px">
+
+        <!-- 링크 품질 게이지 -->
+        <div class="ticn-meter-wrap" style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div class="ticn-meter-label">링크 품질 (LQ)</div>
+            <div class="ticn-meter-val" id="ticn-lq-val">-- / 100</div>
+          </div>
+          <div class="ticn-lq-track">
+            <div class="ticn-lq-fill" id="ticn-lq-fill"></div>
+          </div>
+        </div>
+
+        <!-- 패킷 손실률 -->
+        <div class="ticn-meter-wrap" style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div class="ticn-meter-label">패킷 손실</div>
+            <div class="ticn-meter-val" id="ticn-loss-val">-- %</div>
+          </div>
+          <div class="ticn-lq-track">
+            <div class="ticn-loss-fill" id="ticn-loss-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 토폴로지 플로우 -->
+      <div class="ticn-topo">
+        <div class="ticn-node" id="topo-uav">UAV</div>
+        <div class="ticn-arrow" id="topo-a1">→</div>
+        <div class="ticn-node" id="topo-gcs">GCS</div>
+        <div class="ticn-arrow" id="topo-a2">→</div>
+        <div class="ticn-node" id="topo-tmmr">TMMR</div>
+        <div class="ticn-arrow" id="topo-a3">→</div>
+        <div class="ticn-node" id="topo-router">Router</div>
+        <div class="ticn-arrow" id="topo-a4">→</div>
+        <div class="ticn-node" id="topo-c2">C2/BMS</div>
+      </div>
+    </div>
+
   </div>
 
 </div>

@@ -124,6 +124,20 @@ def main():
                 send_to_gcs(payload)
                 print(f"[CC] → GCS {GCS_HOST}:{GCS_PORT}  SEQ={seq}")
 
+        elif msg_type == "MISSION_ITEM_REACHED":
+            wp_seq = msg.seq
+            print(f"[CC] MISSION_ITEM_REACHED | WP{wp_seq + 1} (seq={wp_seq})")
+            payload_wp = {
+                "platform_id":   PLATFORM_ID,
+                "platform_type": "UAV",
+                "message_type":  "mission_item_reached",
+                "event":         "MISSION_ITEM_REACHED",
+                "wp_seq":        wp_seq,
+                **state,
+                "timestamp": time.time(),
+            }
+            send_to_gcs(payload_wp)
+
 
 if __name__ == "__main__":
     main()

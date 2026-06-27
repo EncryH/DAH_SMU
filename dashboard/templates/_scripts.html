@@ -501,16 +501,15 @@
 
     function rowMatchesFilter(tr) {
       if (activeFilters.has('all')) return true;
-      // 유형 그룹 (tel / cmd) — 선택된 것 중 하나라도 일치
-      const typeFilters = ['tel', 'cmd'].filter(f => activeFilters.has(f));
-      const typeMatch = typeFilters.length === 0 || typeFilters.includes(tr.dataset.type);
-      // 플랫폼 그룹 (uav / ugv) — 선택된 것 중 하나라도 일치
-      const platFilters = ['uav', 'ugv'].filter(f => activeFilters.has(f));
-      const platMatch = platFilters.length === 0 ||
-        (platFilters.includes('uav') && tr.classList.contains('row-uav')) ||
-        (platFilters.includes('ugv') && tr.classList.contains('row-ugv'));
-      // 두 그룹 모두 통과해야 표시
-      return typeMatch && platMatch;
+      const type = tr.dataset.type;  // 'tel' | 'cmd' | 'atk' | 'def'
+      const checks = [];
+      if (activeFilters.has('atk')) checks.push(type === 'atk');
+      if (activeFilters.has('def')) checks.push(type === 'def');
+      if (activeFilters.has('tel')) checks.push(type === 'tel');
+      if (activeFilters.has('cmd')) checks.push(type === 'cmd');
+      if (activeFilters.has('uav')) checks.push(tr.classList.contains('row-uav'));
+      if (activeFilters.has('ugv')) checks.push(tr.classList.contains('row-ugv'));
+      return checks.length === 0 || checks.some(Boolean);
     }
 
     function applyFilter() {
@@ -528,10 +527,11 @@
 
     const logScroll = logBody.closest('.log-scroll');
     function addLog(html) {
+      const atBottom = !logScroll || logScroll.scrollHeight - logScroll.scrollTop - logScroll.clientHeight < 40;
       logBody.insertAdjacentHTML('beforeend', html);
       if (logBody.children.length > 150) logBody.firstElementChild.remove();
       applyFilter();
-      if (logScroll) logScroll.scrollTop = logScroll.scrollHeight;
+      if (atBottom && logScroll) logScroll.scrollTop = logScroll.scrollHeight;
     }
 
     // 헤더 칩 유틸
@@ -550,7 +550,8 @@
       let data;
       try { data = await (await fetch('/api/live')).json(); } catch { return; }
 
-      const events    = data.events || [];
+      const events       = data.events || [];
+      const agentEvents  = data.agent_events || [];
       const platforms = {};
       (data.platforms || []).forEach(p => { platforms[p.platform_id] = p; });
 
@@ -628,9 +629,26 @@
         return d.toTimeString().slice(0, 8);
       }
 
-      // Telemetry 로그 — type이 telemetry인 이벤트만
+      // Telemetry 로그 — MISSION_ITEM_REACHED 먼저 (dedup 없이 항상 표시)
+      events.filter(ev => ev.message && ev.message.startsWith('MISSION_ITEM_REACHED')).forEach(ev => {
+        const localTime = utcToLocal(ev.time);
+        const key = `wp|${localTime}|${ev.message}`;
+        if (seen1.has(key)) return;
+        seen1.add(key);
+        addLog(`<tr class="row-uav" data-type="tel">
+          <td class="col-time">${localTime}</td>
+          <td><span class="log-type-tel">TEL</span></td>
+          <td class="col-src-uav">UAV-001</td>
+          <td class="col-data" style="color:#22c55e;font-weight:600">${ev.message}</td>
+          <td><span class="badge b-mav">MAVLink</span></td>
+          <td><span class="badge b-ok">정상</span></td>
+        </tr>`);
+      });
+
+      // 일반 telemetry — source 기준 dedup (폴링 주기당 1건)
       const latestBySource = {};
-      events.filter(ev => ev.type === 'telemetry' || !ev.type).forEach(ev => {
+      events.filter(ev => (ev.type === 'telemetry' || !ev.type)
+        && !(ev.message && ev.message.startsWith('MISSION_ITEM_REACHED'))).forEach(ev => {
         latestBySource[ev.source] = ev;
       });
       Object.values(latestBySource).forEach(ev => {
@@ -653,7 +671,7 @@
           <td class="${srcCls}">${ev.source}</td>
           <td class="col-data" title="${mtype}: ${detail}">${mtype}: ${detail}</td>
           <td>${proto}</td>
-          <td></td>
+          <td><span class="badge b-ok">정상</span></td>
         </tr>`);
       });
 
@@ -677,6 +695,35 @@
           <td class="col-data">${ev.message} — ${ev.source}</td>
           <td></td>
           <td>${badge}</td>
+        </tr>`);
+      });
+
+      // Agent 이벤트 렌더링 — ATK(빨간) / DEF(청록)
+      agentEvents.forEach(ev => {
+        const localTime = utcToLocal(ev.time);
+        const key = `agent|${localTime}|${ev.agent_type}|${ev.source}|${ev.message}|${ev.status}`;
+        if (seen1.has(key)) return;
+        seen1.add(key);
+        const isAtk   = ev.agent_type === 'ATK';
+        const rowCls  = isAtk ? 'row-atk' : 'row-def';
+        const typeLbl = isAtk
+          ? '<span class="log-type-atk">ATK</span>'
+          : '<span class="log-type-def">DEF</span>';
+        const srcBadge = isAtk
+          ? `<span class="badge b-atk">${ev.source}</span>`
+          : `<span class="badge b-def">${ev.source}</span>`;
+        let statusBadge = '';
+        if      (ev.status === 'ALERT')    statusBadge = '<span class="badge b-alert">ALERT</span>';
+        else if (ev.status === 'BLOCKED')  statusBadge = '<span class="badge b-blocked">BLOCKED</span>';
+        else if (ev.status === 'INJECTED') statusBadge = '<span class="badge b-atk">INJECT</span>';
+        else if (ev.status === 'FAILED')   statusBadge = '<span class="badge b-blocked">차단됨</span>';
+        addLog(`<tr class="${rowCls}" data-type="${isAtk ? 'atk' : 'def'}">
+          <td class="col-time">${localTime}</td>
+          <td>${typeLbl}</td>
+          <td>${srcBadge}</td>
+          <td class="col-data" title="${ev.detail || ev.message}">${ev.message}${ev.detail ? ' — ' + ev.detail : ''}</td>
+          <td></td>
+          <td>${statusBadge}</td>
         </tr>`);
       });
     }
@@ -726,14 +773,7 @@
       setTimeout(() => updateCmdBadge('UAV-001', labels[cmd] || cmd, 'ACK'), 800 + Math.random() * 600);
     };
 
-    // ── 최근 명령 로그 ──────────────────────────────────────────────────
-    const CMD_SEED = [
-      { src: 'UAV-001', name: '경로 유지',       status: 'ACK'  },
-      { src: 'UGV-001', name: '정찰 구역 유지',  status: 'ACK'  },
-      { src: 'UAV-001', name: '센서 상태 조회',  status: 'ACK'  },
-      { src: 'UGV-001', name: '전진 이동 20m/s', status: 'ACK'  },
-      { src: 'UAV-001', name: '상태 보고 요청',  status: 'SENT' },
-    ];
+    // ── 최근 명령 로그 (실제 버튼 명령만 기록) ─────────────────────────
     const cmdLog = document.getElementById('cmd-log');
 
     function nowStr() { return new Date().toTimeString().slice(0, 8); }
@@ -751,14 +791,6 @@
         <span class="cmd-badge ${badgeCls}">${status}</span>`;
       return div;
     }
-
-    // 시드 데이터로 초기 로그 채우기
-    const now = Date.now();
-    CMD_SEED.forEach((c, i) => {
-      const t = new Date(now - (CMD_SEED.length - i) * 3000);
-      cmdLog.appendChild(makeCmdItem(t.toTimeString().slice(0,8), c.src, c.name, c.status));
-    });
-    cmdLog.scrollTop = cmdLog.scrollHeight;
 
     // 휠 스크롤 속도 줄이기
     cmdLog.addEventListener('wheel', e => {
@@ -782,22 +814,6 @@
       badge.className = 'cmd-badge ' + (status === 'ACK' ? 'cmd-badge-ack' : 'cmd-badge-sent');
       badge.textContent = status;
     }
-
-    // 주기적 시뮬레이션 명령 (10~20초 간격)
-    const AUTO_CMDS = [
-      { src: 'UAV-001', name: '웨이포인트 갱신' },
-      { src: 'UGV-001', name: '속도 조절 명령' },
-      { src: 'UAV-001', name: '센서 데이터 요청' },
-      { src: 'UGV-001', name: '경로 재계산' },
-      { src: 'UAV-001', name: '연료 상태 보고' },
-      { src: 'UAV-001', name: '목표 좌표 전송' },
-    ];
-    (function autoCmd() {
-      const c = AUTO_CMDS[Math.floor(Math.random() * AUTO_CMDS.length)];
-      appendCmd(c.src, c.name, 'SENT');
-      setTimeout(() => updateCmdBadge(c.src, c.name, 'ACK'), 600 + Math.random() * 800);
-      setTimeout(autoCmd, 10000 + Math.random() * 10000);
-    })();
 
   })();
 
@@ -928,37 +944,6 @@
         </tr>`);
       });
 
-      Object.values(platforms).forEach(p => {
-        const prev = lastSeqs[p.platform_id];
-        if (prev === undefined) { lastSeqs[p.platform_id] = p.seq; return; }
-        if (p.seq === prev) return;
-        lastSeqs[p.platform_id] = p.seq;
-        const isUAV = p.platform_type === 'UAV';
-        const now   = new Date().toTimeString().slice(0, 8);
-        let cmd, src, ack = 'ok';
-        if (isUAV) {
-          if      (p.fuel < 30)       { cmd = `RTB (연료 부족 ${p.fuel}%)`;   src = 'Upper C2/BMS'; }
-          else if (p.seq % 6 === 0)   { cmd = `WAYPOINT 이동 (seq=${p.seq})`; src = 'Upper C2/BMS'; }
-          else if (p.seq % 4 === 0)   { cmd = `고도 유지 (${p.alt}m)`;        src = 'GCS'; }
-          else                        { cmd = `상태 보고 요청`;                src = 'Upper C2/BMS'; ack = 'pend'; }
-        } else {
-          if      (p.battery < 20)    { cmd = `복귀 명령 (배터리 ${p.battery}%)`; src = 'GCS'; }
-          else if (p.seq % 5 === 0)   { cmd = `전진 이동 (${p.speed}m/s)`;    src = 'GCS'; }
-          else if (p.seq % 3 === 0)   { cmd = `정찰 구역 유지`;               src = 'Upper C2/BMS'; }
-          else                        { cmd = `센서 상태 조회`;                src = 'Upper C2/BMS'; ack = 'pend'; }
-        }
-        const ackBadge = ack === 'ok' ? '<span class="ack-ok">ACK</span>' : '<span class="ack-pend">PENDING</span>';
-        const srcCls = isUAV ? 'col-src-uav' : 'col-src-ugv';
-        const rowCls = isUAV ? 'row-uav' : 'row-ugv';
-        addRow(cb, `<tr class="${rowCls}">
-          <td class="col-time">${now}</td>
-          <td class="${srcCls}">${p.platform_id}</td>
-          <td class="col-type">${cmd}</td>
-          <td><span class="proto-c2">${src}</span></td>
-          <td><span class="st-ok">정상</span></td>
-          <td>${ackBadge}</td>
-        </tr>`);
-      });
 
       agentTick++;
       if (agentTick % 4 === 0) {

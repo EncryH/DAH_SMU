@@ -149,42 +149,51 @@ services:
   # ── 정찰 에이전트 (도청)
   dah-recon:
     profiles: ["cyber-lab"]
+    restart: "no"
     build:
       context: .
       dockerfile: attack_agent/Dockerfile
     container_name: dah-recon
-    depends_on:
-      - dah-uav
+    environment:
+      DASHBOARD_HOST: dah-dashboard
+      DASHBOARD_PORT: "14571"
     networks:
       dah-net:
         ipv4_address: 172.20.0.40
+      ops_net:
 
   # ── 공격 에이전트 (LAND 명령 주입)
   dah-executor:
     profiles: ["cyber-lab"]
+    restart: "no"
     build:
       context: .
       dockerfile: attack_agent/Dockerfile
     container_name: dah-executor
     command: ["python", "executor.py"]
-    depends_on:
-      - dah-uav
+    environment:
+      DASHBOARD_HOST: dah-dashboard
+      DASHBOARD_PORT: "14571"
     networks:
       dah-net:
         ipv4_address: 172.20.0.50
+      ops_net:
 
   # ── 방어 에이전트 (탐지 + 차단)
   dah-defense:
     profiles: ["cyber-lab"]
+    restart: "no"
     build:
       context: .
       dockerfile: defense_agent/Dockerfile
     container_name: dah-defense
-    depends_on:
-      - dah-uav
+    environment:
+      DASHBOARD_HOST: dah-dashboard
+      DASHBOARD_PORT: "14571"
     networks:
       dah-net:
         ipv4_address: 172.20.0.60
+      ops_net:
 
   # ── API Gateway (nginx) — localhost:8080 단일 진입점
   dah-gateway:

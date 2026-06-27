@@ -1,31 +1,47 @@
-import time
+import json
+import os
+import socket
 import threading
+import time
 from pymavlink import mavutil
 from detector import detect
 from responder import respond
 
-# ─────────────────────────────────────────
-# 방어 에이전트 설정
-# ─────────────────────────────────────────
-LISTEN_HOST  = '0.0.0.0'    # 모든 IP에서 오는 패킷 수신
-LISTEN_PORT  = 14551         # UAV 텔레메트리 포트 감시
-ALLOWED_GCS_ID = 255         # 정상 GCS SYS_ID
-CHECK_INTERVAL = 2           # 탐지 주기 (초)
+LISTEN_HOST    = '0.0.0.0'
+LISTEN_PORT    = 14551
+ALLOWED_GCS_ID = 255
+CHECK_INTERVAL = 0.5
 
-# monitor가 수집한 경보 저장소
-alerts = []
+DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "dah-dashboard")
+DASHBOARD_PORT = int(os.getenv("DASHBOARD_PORT", "14571"))
 
-# SEQ 역전 탐지용
+alerts   = []
 last_seq = {}
+_evt_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+
+def _send(source, message, level="info", detail="", status=""):
+    evt = {
+        "platform_type": "AGENT",
+        "agent_type":    "DEF",
+        "platform_id":   "DEF-001",
+        "source":        source,
+        "message":       message,
+        "detail":        detail,
+        "level":         level,
+        "status":        status,
+        "time":          time.strftime("%H:%M:%S"),
+    }
+    try:
+        _evt_sock.sendto(json.dumps(evt).encode(), (DASHBOARD_HOST, DASHBOARD_PORT))
+    except Exception:
+        pass
 
 
 def monitor():
-    """
-    MAVLink 패킷 실시간 감시
-    이상 패킷 발견 시 alerts에 추가
-    """
     mav = mavutil.mavlink_connection(f'udpin:{LISTEN_HOST}:{LISTEN_PORT}')
     print(f"[DEFENSE] 감시 시작 → 포트 {LISTEN_PORT}")
+    _send("MONITOR", "패킷 감시 시작", detail=f"UDP {LISTEN_PORT} 포트")
 
     while True:
         msg = mav.recv_match(blocking=True)
@@ -36,67 +52,84 @@ def monitor():
         src_id   = msg.get_srcSystem()
         seq      = msg._header.seq
 
-        # ── COMMAND_LONG 패킷 감시
         if msg_type == 'COMMAND_LONG':
             cmd = msg.command
             print(f"[DEFENSE] COMMAND_LONG 감지 | SYS_ID={src_id} | 명령={cmd} | SEQ={seq}")
 
-            # 허용되지 않은 SYS_ID → 경보
             if src_id != ALLOWED_GCS_ID:
                 alerts.append({
-                    'type'   : 'UNKNOWN_SRC',
-                    'src_id' : src_id,
-                    'cmd'    : cmd,
-                    'seq'    : seq
+                    'type':   'UNKNOWN_SRC',
+                    'src_id': src_id,
+                    'cmd':    cmd,
+                    'seq':    seq,
                 })
                 print(f"[DEFENSE] ⚠️  비정상 출처 → SYS_ID={src_id}")
+                _send("MONITOR",
+                      f"비정상 COMMAND_LONG 탐지",
+                      level="warn",
+                      detail=f"SYS_ID={src_id} (허용={ALLOWED_GCS_ID}) cmd={cmd} SEQ={seq}",
+                      status="ALERT")
+            else:
+                _send("MONITOR",
+                      f"정상 명령 수신",
+                      detail=f"SYS_ID={src_id} cmd={cmd} SEQ={seq}")
 
-        # ── Replay Attack 탐지
         if src_id in last_seq:
             if seq <= last_seq[src_id]:
                 alerts.append({
-                    'type'   : 'REPLAY',
-                    'src_id' : src_id,
-                    'seq'    : seq
+                    'type':   'REPLAY',
+                    'src_id': src_id,
+                    'seq':    seq,
                 })
                 print(f"[DEFENSE] ⚠️  Replay Attack 의심 → SEQ={seq} (이전={last_seq[src_id]})")
+                _send("MONITOR",
+                      f"Replay Attack 의심",
+                      level="warn",
+                      detail=f"SYS_ID={src_id} SEQ={seq} ≤ 이전={last_seq[src_id]}",
+                      status="ALERT")
 
         last_seq[src_id] = seq
 
 
 def defense_loop():
-    """
-    주기적으로 alerts 확인
-    위협 탐지 시 responder 호출
-    """
+    idle_ticks = 0
     while True:
         time.sleep(CHECK_INTERVAL)
 
         if not alerts:
+            idle_ticks += 1
+            if idle_ticks >= 20:  # 0.5s × 20 = 10초마다 상태 보고
+                idle_ticks = 0
+                _send("MONITOR",
+                      "감시 중 — 이상 없음",
+                      level="info",
+                      detail=f"UDP {LISTEN_PORT} 포트 정상 감시 중",
+                      status="OK")
             continue
 
-        # 쌓인 경보 전달 후 초기화
+        idle_ticks = 0
         current_alerts = alerts.copy()
         alerts.clear()
 
-        # 탐지
         threats = detect(current_alerts)
-
         if threats:
             print(f"[DEFENSE] 위협 {len(threats)}건 탐지 → 대응 시작")
-            respond(threats)
+            _send("DETECTOR",
+                  f"위협 {len(threats)}건 탐지",
+                  level="warn",
+                  detail="; ".join(t.get('reason', '') for t in threats),
+                  status="THREAT")
+            respond(threats, _send)
 
 
 def main():
     print(f"[DEFENSE] 방어 에이전트 시작")
-    print(f"[DEFENSE] monitor + detector + responder 통합 실행")
-    print("-" * 50)
+    _send("DEFENSE", "방어 에이전트 시작",
+          level="info",
+          detail=f"monitor + detector + responder 통합 실행")
 
-    # 감시는 별도 스레드로 실행 (논블로킹)
     t = threading.Thread(target=monitor, daemon=True)
     t.start()
-
-    # 메인 스레드에서 탐지 + 대응 루프 실행
     defense_loop()
 
 

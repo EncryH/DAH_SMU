@@ -78,15 +78,22 @@ def cc_listener():
             continue
 
         pid = payload.get("platform_id", "UNKNOWN")
-        platforms[pid] = {**payload, "gcs_received_at": time.time()}
 
-        add_event(pid,
-            f"telemetry seq={payload.get('seq')} "
-            f"alt={payload.get('alt')}m fuel={payload.get('fuel')}%")
-        print(f"[GCS] ← CC  {pid}  seq={payload.get('seq')}  "
-              f"alt={payload.get('alt')}m  fuel={payload.get('fuel')}%")
-
-        fanout(platforms[pid])
+        if payload.get("event") == "MISSION_ITEM_REACHED":
+            wp_num = payload.get("wp_seq", 0) + 1
+            add_event(pid,
+                f"MISSION_ITEM_REACHED WP{wp_num} "
+                f"lat={round(payload.get('lat', 0), 5)} alt={payload.get('alt', '--')}m",
+                event_type="telemetry")
+            print(f"[GCS] ← CC  {pid}  MISSION_ITEM_REACHED WP{wp_num}")
+        else:
+            platforms[pid] = {**payload, "gcs_received_at": time.time()}
+            add_event(pid,
+                f"telemetry seq={payload.get('seq')} "
+                f"alt={payload.get('alt')}m fuel={payload.get('fuel')}%")
+            print(f"[GCS] ← CC  {pid}  seq={payload.get('seq')}  "
+                  f"alt={payload.get('alt')}m  fuel={payload.get('fuel')}%")
+            fanout(platforms[pid])
 
 
 def c2_cmd_listener():
